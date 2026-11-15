@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"go_final_project/pkg/db"
@@ -13,28 +14,29 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&task)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+		writeJSON(w, map[string]string{"error": "Некорректный JSON"}, http.StatusBadRequest)
 		return
 	}
 
 	if task.Title == "" {
-		writeJSON(w, map[string]string{"error": "Не указан заголовок задачи"})
+		writeJSON(w, map[string]string{"error": "Не указан заголовок задачи"}, http.StatusBadRequest)
 		return
 	}
 
 	task.Date, err = checkDate(task.Date, task.Repeat)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+		writeJSON(w, map[string]string{"error": err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	id, err := db.AddTask(&task)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+		log.Printf("Ошибка добавления задачи в БД: %v", err)
+		writeJSON(w, map[string]string{"error": "Внутренняя ошибка сервера"}, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, map[string]string{"id": fmt.Sprint(id)})
+	writeJSON(w, map[string]string{"id": fmt.Sprint(id)}, http.StatusOK)
 }
 
 func TaskHandler(w http.ResponseWriter, r *http.Request) {

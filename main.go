@@ -24,6 +24,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Ошибка закрытия БД: %v", err)
+		}
+	}()
+
 	webDir := "./web"
 
 	http.HandleFunc("/api/nextdate", api.NextDateHandler)

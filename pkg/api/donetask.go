@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -12,7 +14,7 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, map[string]string{
 			"error": "Метод не поддерживается",
-		})
+		}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -20,44 +22,50 @@ func DoneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		writeJSON(w, map[string]string{
 			"error": "Не указан идентификатор",
-		})
+		}, http.StatusBadRequest)
 		return
 	}
 
 	task, err := db.GetTask(id)
 	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			writeJSON(w, map[string]string{
+				"error": "Задача не найдена",
+			}, http.StatusNotFound)
+			return
+		}
+
+		log.Printf("Ошибка получения задачи из БД: %v", err)
 		writeJSON(w, map[string]string{
-			"error": "Задача не найдена",
-		})
+			"error": "Внутренняя ошибка сервера",
+		}, http.StatusInternalServerError)
 		return
 	}
 
 	if task.Repeat == "" {
 		err = db.DeleteTask(id)
-		if err != nil {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			})
-			return
-		}
 	} else {
-		now := time.Now()
-		next, err := nextdate.NextDate(now, task.Date, task.Repeat)
-		if err != nil {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		err = db.UpdateDate(next, id)
-		if err != nil {
-			writeJSON(w, map[string]string{
-				"error": err.Error(),
-			})
-			return
+		var next string
+		next, err = nextdate.NextDate(time.Now(), task.Date, task.Repeat)
+		if err == nil {
+			err = db.UpdateDate(next, id)
 		}
 	}
 
-	writeJSON(w, map[string]string{})
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			writeJSON(w, map[string]string{
+				"error": "Задача не найдена",
+			}, http.StatusNotFound)
+			return
+		}
+
+		log.Printf("Ошибка выполнения задачи: %v", err)
+		writeJSON(w, map[string]string{
+			"error": "Внутренняя ошибка сервера",
+		}, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]string{}, http.StatusOK)
 }
