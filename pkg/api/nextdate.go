@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -20,6 +21,7 @@ func NextDateHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, err := nextdate.NextDate(now, date, repeat)
 	if err != nil {
+		log.Printf("Ошибка вычисления следующей даты: %v", err)
 		result = ""
 	}
 
